@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eclipse Football Scoreboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tone@14.7.58/build/Tone.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #fef3c7;
+            color: #4a5568;
+        }
+        .scoreboard-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .scoreboard-card {
+            background-color: #fffbeb;
+            border: 2px solid #fde68a;
+        }
+        .score-display {
+            font-size: 8rem;
+            line-height: 1;
+        }
+        .team-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.7);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fffbeb;
+            padding: 20px;
+            border-radius: 12px;
+            width: 80%;
+            max-width: 400px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        #whistle-animation {
+            font-size: 4rem;
+            color: #d97706;
+            animation: none;
+        }
+        @keyframes pulse-whistle {
+            0% { transform: scale(1); opacity: 1; color: #d97706; }
+            50% { transform: scale(1.2); opacity: 0.8; color: #facc15; }
+            100% { transform: scale(1); opacity: 1; color: #d97706; }
+        }
+    </style>
+</head>
+<body class="bg-amber-50 text-gray-800">
+    <div class="scoreboard-container">
+        <div class="scoreboard-card p-8 rounded-2xl shadow-2xl w-full max-w-4xl mx-4">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-center mb-6 text-stone-800">
+                Eclipse Football Scoreboard
+            </h1>
+            <div class="flex flex-col md:flex-row justify-between items-center gap-8 mb-8">
+                <div class="team-section flex-1 bg-amber-100 p-6 rounded-xl shadow-lg w-full">
+                    <h2 class="text-2xl font-semibold mb-2 text-center text-stone-700">HOME</h2>
+                    <div id="home-score" class="score-display font-mono font-bold text-stone-900 text-center">0</div>
+                    <button onclick="openScorerModal('home')" class="bg-amber-700 hover:bg-amber-800 text-white font-bold py-2 px-4 rounded-full transition-colors duration-200 shadow-md mt-4">+1 Goal</button>
+                </div>
+                <div class="flex flex-col items-center bg-amber-100 p-6 rounded-xl shadow-lg">
+                    <div class="text-xl font-bold mb-2">Game Clock</div>
+                    <div id="game-clock" class="text-5xl md:text-6xl font-mono text-center font-bold text-stone-900">00:00</div>
+                    <div id="quarter" class="text-xl mt-2 font-bold">Quarter: 1</div>
+                    <div class="flex flex-col items-center gap-2 mt-4">
+                        <div class="flex items-center gap-2">
+                            <label for="quarter-time" class="font-medium text-sm">Set Quarter Time (min):</label>
+                            <input type="number" id="quarter-time-input" value="15" min="1" class="w-20 px-2 py-1 text-center bg-amber-200 rounded-md text-stone-800 border border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                            <button id="set-timer-btn" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-1 px-3 rounded-lg transition-colors duration-200 shadow-md">Set</button>
+                        </div>
+                        <div class="flex items-center gap-2 mt-2">
+                            <label for="total-quarters" class="font-medium text-sm">Total Quarters:</label>
+                            <input type="number" id="total-quarters-input" value="4" min="1" class="w-20 px-2 py-1 text-center bg-amber-200 rounded-md text-stone-800 border border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        </div>
+                        <div class="flex gap-2 mt-2">
+                            <button id="start-btn" class="bg-green-700 hover:bg-green-800 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200 shadow-md">Start</button>
+                            <button id="stop-btn" class="bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200 shadow-md">Stop</button>
+                        </div>
+                        <button onclick="changeQuarter()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded-lg mt-2 transition-colors duration-200 shadow-md">Next Quarter</button>
+                    </div>
+                </div>
+                <div class="team-section flex-1 bg-amber-100 p-6 rounded-xl shadow-lg w-full">
+                    <h2 class="text-2xl font-semibold mb-2 text-center text-stone-700">AWAY</h2>
+                    <div id="away-score" class="score-display font-mono font-bold text-stone-900 text-center">0</div>
+                    <button onclick="openScorerModal('away')" class="bg-amber-700 hover:bg-amber-800 text-white font-bold py-2 px-4 rounded-full transition-colors duration-200 shadow-md mt-4">+1 Goal</button>
+                </div>
+            </div>
+            <div class="mt-8 text-center bg-amber-100 p-6 rounded-xl shadow-lg">
+                <h2 class="text-2xl font-extrabold text-stone-800 mb-4">Goal Scorers</h2>
+                <div class="flex flex-col md:flex-row justify-around">
+                    <div class="w-full md:w-1/2 p-2">
+                        <h3 class="text-lg font-semibold text-stone-700 mb-2">HOME</h3>
+                        <ul id="home-scorers-list" class="list-disc list-inside text-left mx-auto max-w-xs"></ul>
+                    </div>
+                    <div class="w-full md:w-1/2 p-2">
+                        <h3 class="text-lg font-semibold text-stone-700 mb-2">AWAY</h3>
+                        <ul id="away-scorers-list" class="list-disc list-inside text-left mx-auto max-w-xs"></ul>
+                    </div>
+                </div>
+                <button onclick="clearScorers()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg mt-4 transition-colors duration-200 shadow-md">Clear Scorers</button>
+            </div>
+            <div class="flex justify-center mt-6">
+                <button onclick="resetGame()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-8 rounded-xl transition-colors duration-200 shadow-xl">RESET GAME</button>
+            </div>
+            <div id="message-box" class="mt-4 text-red-700 font-medium text-center"></div>
+        </div>
+    </div>
+    <div id="scorer-modal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-2xl font-bold text-center mb-4">Enter Goal Scorer</h2>
+            <p class="text-center mb-4">Please enter the name of the player who scored for the <span id="modal-team-name" class="font-bold"></span> team.</p>
+            <input type="text" id="scorer-name-input" placeholder="Player's Name" class="w-full px-4 py-2 bg-amber-200 rounded-md text-stone-800 border border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-500 mb-4">
+            <div class="flex justify-center gap-4">
+                <button onclick="submitScorer()" class="bg-green-700 hover:bg-green-800 text-white font-bold py-2 px-6 rounded-lg transition-colors duration-200 shadow-md">Submit</button>
+                <button onclick="closeScorerModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition-colors duration-200 shadow-md">Cancel</button>
+            </div>
+        </div>
+    </div>
+    <div id="additional-time-modal" class="modal">
+        <div class="modal-content text-center">
+            <div class="flex justify-center items-center mb-4">
+                <span id="whistle-animation">📢</span>
+            </div>
+            <h2 class="text-2xl font-bold mb-4">Quarter Over!</h2>
+            <p class="mb-4">Would you like to add additional time?</p>
+            <div class="flex justify-center items-center gap-2 mb-4">
+                <label for="added-time-input" class="font-medium text-sm">Add (min):</label>
+                <input type="number" id="added-time-input" value="1" min="1" class="w-20 px-2 py-1 text-center bg-amber-200 rounded-md text-stone-800 border border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-500">
+            </div>
+            <div class="flex justify-center gap-4">
+                <button onclick="submitAdditionalTime()" class="bg-green-700 hover:bg-green-800 text-white font-bold py-2 px-6 rounded-lg transition-colors duration-200 shadow-md">Add Time</button>
+                <button onclick="changeQuarter()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition-colors duration-200 shadow-md">Next Quarter</button>
+            </div>
+        </div>
+    </div>
+    <footer class="text-center mt-8 py-4 text-sm text-stone-700">
+        <p>&copy; 2025 Eclipse Codez . All Rights Reserved.</p>
+    </footer>
+    <script>
+        const homeScoreEl = document.getElementById('home-score');
+        const awayScoreEl = document.getElementById('away-score');
+        const clockEl = document.getElementById('game-clock');
+        const quarterEl = document.getElementById('quarter');
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const setTimerBtn = document.getElementById('set-timer-btn');
+        const quarterTimeInput = document.getElementById('quarter-time-input');
+        const totalQuartersInput = document.getElementById('total-quarters-input');
+        const messageBox = document.getElementById('message-box');
+        const scorerModal = document.getElementById('scorer-modal');
+        const additionalTimeModal = document.getElementById('additional-time-modal');
+        const modalTeamName = document.getElementById('modal-team-name');
+        const scorerNameInput = document.getElementById('scorer-name-input');
+        const addedTimeInput = document.getElementById('added-time-input');
+        const homeScorersList = document.getElementById('home-scorers-list');
+        const awayScorersList = document.getElementById('away-scorers-list');
+        const whistleAnimationEl = document.getElementById('whistle-animation');
+        let homeScore = 0;
+        let awayScore = 0;
+        let quarter = 1;
+        let totalQuarters = 4;
+        let elapsedTime = 0;
+        let quarterDuration = 900;
+        let timerInterval;
+        let isRunning = false;
+        let currentTeam = '';
+        let goalScorers = [];
+        function showMessage(msg) {
+            messageBox.textContent = msg;
+            setTimeout(() => {
+                messageBox.textContent = '';
+            }, 3000);
+        }
+        function updateScores() {
+            homeScoreEl.textContent = homeScore;
+            awayScoreEl.textContent = awayScore;
+        }
+        function renderScorers() {
+            homeScorersList.innerHTML = '';
+            awayScorersList.innerHTML = '';
+            goalScorers.forEach(goal => {
+                const li = document.createElement('li');
+                li.textContent = `${goal.scorer} (${goal.time})`;
+                if (goal.team === 'home') {
+                    homeScorersList.appendChild(li);
+                } else {
+                    awayScorersList.appendChild(li);
+                }
+            });
+        }
+        function addGoalAndScorer(team, scorerName) {
+            if (team === 'home') {
+                homeScore++;
+            } else if (team === 'away') {
+                awayScore++;
+            }
+            const timeScored = formatTime(elapsedTime);
+            goalScorers.push({ team: team, scorer: scorerName, time: timeScored });
+            updateScores();
+            renderScorers();
+            showMessage(`Goal scored by ${scorerName} for the ${team} team!`);
+        }
+        function openScorerModal(team) {
+            currentTeam = team;
+            modalTeamName.textContent = team.toUpperCase();
+            scorerModal.style.display = 'flex';
+            scorerNameInput.focus();
+        }
+        function closeScorerModal() {
+            scorerModal.style.display = 'none';
+            scorerNameInput.value = '';
+        }
+        function submitScorer() {
+            const scorerName = scorerNameInput.value.trim();
+            if (scorerName) {
+                addGoalAndScorer(currentTeam, scorerName);
+                closeScorerModal();
+            } else {
+                showMessage("Please enter a player's name.");
+            }
+        }
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            const formattedMinutes = String(minutes).padStart(2, '0');
+            const formattedSeconds = String(remainingSeconds).padStart(2, '0');
+            return `${formattedMinutes}:${formattedSeconds}`;
+        }
+        function startTimer() {
+            if (isRunning) return;
+            if (Tone.context.state !== 'running') {
+                Tone.start();
+            }
+            isRunning = true;
+            timerInterval = setInterval(() => {
+                if (elapsedTime < quarterDuration) {
+                    elapsedTime++;
+                    clockEl.textContent = formatTime(elapsedTime);
+                } else {
+                    stopTimer();
+                    whistleAnimation();
+                    openAdditionalTimeModal();
+                }
+            }, 1000);
+            showMessage("Timer started.");
+        }
+        function stopTimer() {
+            if (!isRunning) return;
+            clearInterval(timerInterval);
+            isRunning = false;
+            showMessage("Timer stopped.");
+        }
+        function setQuarterTime() {
+            const minutes = parseInt(quarterTimeInput.value);
+            if (!isNaN(minutes) && minutes > 0) {
+                stopTimer();
+                elapsedTime = 0;
+                quarterDuration = minutes * 60;
+                clockEl.textContent = formatTime(elapsedTime);
+                showMessage(`Quarter time set to ${minutes} minutes.`);
+            } else {
+                showMessage("Please enter a valid time greater than 0.");
+            }
+        }
+        function whistleAnimation() {
+            whistleAnimationEl.style.animation = 'pulse-whistle 1s infinite';
+            const synth = new Tone.Synth({
+                oscillator: {
+                    type: "sine"
+                },
+                envelope: {
+                    attack: 0.01,
+                    decay: 0.2,
+                    sustain: 0,
+                    release: 0.2
+                }
+            }).toDestination();
+            synth.triggerAttackRelease("C6", "0.5");
+            setTimeout(() => {
+                whistleAnimationEl.style.animation = 'none';
+            }, 2000);
+        }
+        function openAdditionalTimeModal() {
+            additionalTimeModal.style.display = 'flex';
+        }
+        function closeAdditionalTimeModal() {
+            additionalTimeModal.style.display = 'none';
+        }
+        function submitAdditionalTime() {
+            const addedMinutes = parseInt(addedTimeInput.value);
+            closeAdditionalTimeModal();
+            if (!isNaN(addedMinutes) && addedMinutes > 0) {
+                quarterDuration += addedMinutes * 60;
+                startTimer();
+                showMessage(`Added ${addedMinutes} minutes of additional time.`);
+            } else {
+                showMessage("Invalid time added. Proceeding to next quarter.");
+                changeQuarter();
+            }
+        }
+        function changeQuarter() {
+            closeAdditionalTimeModal();
+            const newTotalQuarters = parseInt(totalQuartersInput.value);
+            if (!isNaN(newTotalQuarters) && newTotalQuarters > 0) {
+                totalQuarters = newTotalQuarters;
+            } else {
+                showMessage("Invalid total quarters. Defaulting to 4.");
+                totalQuarters = 4;
+            }
+            if (quarter < totalQuarters) {
+                quarter++;
+                quarterEl.textContent = `Quarter: ${quarter}`;
+                setQuarterTime();
+                showMessage(`Entering Quarter ${quarter}.`);
+            } else {
+                showMessage("Game Over!");
+            }
+        }
+        function clearScorers() {
+            goalScorers = [];
+            renderScorers();
+            showMessage("Goal scorer list cleared.");
+        }
+        function resetGame() {
+            stopTimer();
+            homeScore = 0;
+            awayScore = 0;
+            quarter = 1;
+            goalScorers = [];
+            setQuarterTime();
+            updateScores();
+            renderScorers();
+            quarterEl.textContent = `Quarter: 1`;
+            showMessage("Game has been reset.");
+        }
+        startBtn.addEventListener('click', startTimer);
+        stopBtn.addEventListener('click', stopTimer);
+        setTimerBtn.addEventListener('click', setQuarterTime);
+        updateScores();
+        setQuarterTime();
+    </script>
+</body>
+</html>
